@@ -45,6 +45,8 @@ class MLP(nn.Module):
 
 model = MLP()
 
+print(sum(p.numel() for p in model.parameters()))
+
 # print(model)
 
 PATH = './save.pth'

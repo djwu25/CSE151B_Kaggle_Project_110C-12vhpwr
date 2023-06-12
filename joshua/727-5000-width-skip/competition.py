@@ -46,7 +46,6 @@ class taxiData(Dataset):
     #print(np.concatenate([time_data, daytype_data], axis=1))
 
     all_data = torch.tensor(all_xy[:,0:539], dtype=torch.float32)
-#    all_data = torch.tensor(all_xy[:,0:539])
     tmp_x = all_data
 
 #    tmp_x = torch.unsqueeze(all_data, 1)
@@ -81,67 +80,93 @@ class taxiData(Dataset):
   def __getitem__(self, index):
     return self.x[index], self.y[index]
 
-taxi_train = taxiData('jtan-onehot-train.csv')
+taxi_train = taxiData('jtan-onehot-train-clean.csv')
 print(taxi_train)
 
 ###################################
-batch_size = 1000
+batch_size = 512
 train_loader = torch.utils.data.DataLoader(taxi_train, batch_size=batch_size, shuffle=True)
 
-thicc = int(8624 / 2)
+thicc = 5000
 print(thicc)
 
 class MLP(nn.Module):
   def __init__(self):
     super().__init__()
-    self.fc1 = nn.Linear(539, thicc)
+    self.infc = nn.Linear(539, thicc)
+    self.innorm = nn.BatchNorm1d(thicc)
+    self.inact = nn.LeakyReLU()
+    self.fc1 = nn.Linear(thicc, thicc)
     self.norm1 = nn.BatchNorm1d(thicc)
-    self.act1 = nn.ReLU()
+    self.act1 = nn.LeakyReLU()
     self.fc2 = nn.Linear(thicc, thicc)
     self.norm2 = nn.BatchNorm1d(thicc)
-    self.act2 = nn.ReLU()
+    self.act2 = nn.LeakyReLU()
     self.fc3 = nn.Linear(thicc, thicc)
     self.norm3 = nn.BatchNorm1d(thicc)
-    self.act3 = nn.ReLU()
+    self.act3 = nn.LeakyReLU()
     self.fc4 = nn.Linear(thicc, thicc)
     self.norm4 = nn.BatchNorm1d(thicc)
-    self.act4 = nn.ReLU()
-    self.fc5 = nn.Linear(thicc, 1)
+    self.act4 = nn.LeakyReLU()
+
+    self.fc5 = nn.Linear(thicc, thicc)
+    self.norm5 = nn.BatchNorm1d(thicc)
+    self.act5 = nn.LeakyReLU()
+    self.fc6 = nn.Linear(thicc, thicc)
+    self.norm6 = nn.BatchNorm1d(thicc)
+    self.act6 = nn.LeakyReLU()
+    self.fc7 = nn.Linear(thicc, thicc)
+    self.norm7 = nn.BatchNorm1d(thicc)
+    self.act7 = nn.LeakyReLU()
+    self.fc8 = nn.Linear(thicc, thicc)
+    self.norm8 = nn.BatchNorm1d(thicc)
+    self.act8 = nn.LeakyReLU()
+    self.fc9 = nn.Linear(thicc, thicc)
+    self.norm9 = nn.BatchNorm1d(thicc)
+    self.act9 = nn.LeakyReLU()
+
+    self.outfc = nn.Linear(thicc, 1)
   def forward(self, x):
-    x = self.act1(self.norm1(self.fc1(x)))
-    x = self.act2(self.norm2(self.fc2(x)))
-    x = self.act3(self.norm3(self.fc3(x)))
-    x = self.act4(self.norm4(self.fc4(x)))
-    x = self.fc5(x)
+    x = self.inact(self.innorm(self.infc(x)))
+    x = self.act1(self.norm1(x + self.fc1(x)))
+    x = self.act2(self.norm2(x + self.fc2(x)))
+    x = self.act3(self.norm3(x + self.fc3(x)))
+    x = self.act4(self.norm4(x + self.fc4(x)))
+    x = self.act5(self.norm5(x + self.fc5(x)))
+    x = self.act6(self.norm6(x + self.fc6(x)))
+    x = self.act7(self.norm7(x + self.fc7(x)))
+    x = self.act8(self.norm8(x + self.fc8(x)))
+    x = self.act9(self.norm9(x + self.fc9(x)))
+    x = self.outfc(x)
     return x
     
 
 model = MLP()
 
+#PATH = './epoch5-save.pth'
+#model.load_state_dict(torch.load(PATH))
+
 model.to(device)
 print(model)
 
-loss_fn = nn.MSELoss()
-optimizer = optim.SGD(model.parameters(), lr=0.00000001)
+# loss_fn = nn.MSELoss()
+
+def RMSELoss(yhat,y):
+    return torch.sqrt(torch.mean((yhat-y)**2))
+
+loss_fn = RMSELoss
+
+optimizer = optim.SGD(model.parameters(), lr=0.0001)
 
 #print(train_loader)
 
-epochs = 100
-#for epoch in range(epochs):
+epochs = 250
 for epoch in tqdm(range(epochs)):
   running_loss = 0.0
   for i, data in enumerate(train_loader, 0):
-#    print(i, data)
     params, trip_time = data[0].to(device), data[1].to(device)
     trip_time = trip_time.float()
-#    params, trip_time = params.float(), trip_time.float()
     trip_time = trip_time.reshape((trip_time.shape[0], 1))
-    '''
-    print(params)
-    print(params.shape)
-    print(trip_time)
-    print(trip_time.shape)
-    '''
 
     optimizer.zero_grad()
 
@@ -158,7 +183,10 @@ for epoch in tqdm(range(epochs)):
   print(f'[{epoch + 1}] loss: {running_loss / i:.13f}')
   running_loss = 0.0
 
-PATH = './save.pth'
+  PATH = f'./epoch{epoch}-save.pth'
+  torch.save(model.state_dict(), PATH)
+
+PATH = f'./save.pth'
 torch.save(model.state_dict(), PATH)
 
 print("======= DONE =======")
